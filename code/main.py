@@ -1,7 +1,12 @@
 import utils
 from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer
 import torch
+import argparse
 
+
+parser = argparse.ArgumentParser(description='Rename All the files in the directory')
+parser.add_argument('directory', type=str, help="Enter The Directory which files you want to rename" )
+args = parser.parse_args()
 
 torch.set_default_device("cuda")
 
@@ -18,5 +23,6 @@ text_model = AutoModelForCausalLM.from_pretrained(
 text_tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-1.8B-Chat")
 
 
-directory_path = "path/to/directory"
+directory_path=args.directory
+
 utils.rename(directory_path)
