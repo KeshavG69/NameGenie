@@ -32,6 +32,6 @@ Once the new names are generated, NameGenie renames each file accordingly. Now, 
 To install the necessary dependencies, run the following commands:
 
 ```bash
-!apt-get update
-!apt-get install libreoffice -y
+apt-get update
+apt-get install libreoffice -y
 
