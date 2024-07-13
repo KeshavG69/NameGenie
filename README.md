@@ -26,4 +26,12 @@ With the content in hand, NameGenie leverages an intelligent open-source model t
 
 ### 3. Rename Files
 Once the new names are generated, NameGenie renames each file accordingly. Now, instead of generic names like "document1.pdf" or "report.txt," you have meaningful, concise titles that reflect the content of each file.
+## Installation Instructions
+
+### Windows
+To install the necessary dependencies, run the following commands:
+
+```bash
+!apt-get update
+!apt-get install libreoffice -y
 
