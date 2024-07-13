@@ -40,7 +40,7 @@ If you haven't already, clone the NameGenie repository to your local machine:
 
 ```bash
 git clone https://github.com/KeshavG69/NameGenie.git
-cd namegenie
+
 ```
 ## Step 2: Install Dependencies
 Install the necessary Python dependencies using pip:
@@ -56,6 +56,7 @@ Ensure you have a folder containing the files you want to rename.
 ## Step 2: Choose Your Execution Method
 Command Line: To run NameGenie from the command line, use main.py. Execute the following command, specifying the path to your folder:
 ```bash
+cd code
 python main.py /path/to/your/folder
 ```
 IDE: To run NameGenie from an IDE, use main_from_IDE.py. Open the file in your preferred IDE and run it directly.
