@@ -60,7 +60,7 @@ python main.py /path/to/your/folder
 ```
 IDE: To run NameGenie from an IDE, use main_from_IDE.py. Open the file in your preferred IDE and run it directly.
 
-##Features
+## Features
 
 - Local Processing: Ensures your data stays safe by running everything locally on your machine.
   
