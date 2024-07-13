@@ -356,16 +356,31 @@ def rename(directory_path):
     img_supported_formats = [".jpg", ".jpeg", ".png", ".heic"]
 
     files = get_all_files(directory_path)
+    files_name = [Path(file).stem for file in files]
+
     for file in files:
         if Path(file).suffix.lower() in img_supported_formats:
-
-            change_file_name(file, image_name(file))
+            original_name = Path(file).stem
+            output=image_name(file)
+            counter=1
+            original_output = output
+            while output in files_name and output != original_name:
+              output = f"{original_output}_{counter}"
+              counter += 1
+            files_name.append(output)
+            change_file_name(file,output)
             print(f"[SUCCESS] Renamed {file} successfully!! ")
-
         elif Path(file).suffix in supported_formats:
+            original_name = Path(file).stem
+            output=text_name(file)
 
-            change_file_name(file, text_name(file))
+            counter=1
+            original_output = output
+            while output in files_name and output != original_name:
+                output = f"{original_output}_{counter}"
+                counter += 1
+            files_name.append(output)
+            change_file_name(file,output)
             print(f"[SUCCESS] Renamed {file} successfully!! ")
-
         else:
             print("[ERROR] FILE TYPE NOT SUPPORTED")
