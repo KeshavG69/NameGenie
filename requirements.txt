@@ -1,0 +1,9 @@
+torch
+Pillow
+transformers
+unstructured\[all-docs\]
+tiktoken
+accelerate
+bitsandbytes
+flash_attn
+einops
