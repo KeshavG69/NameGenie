@@ -5,5 +5,5 @@ unstructured\[all-docs\]
 tiktoken
 accelerate
 bitsandbytes
-flash_attn
+langchain-huggingface
 einops
