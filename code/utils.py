@@ -3,6 +3,53 @@ from unstructured.partition.auto import partition
 import tiktoken
 import os
 from pathlib import Path
+import requests
+import torch
+from PIL import Image
+from transformers import AutoProcessor, AutoModelForCausalLM, AutoTokenizer
+from unstructured.partition.auto import partition
+import tiktoken
+import os
+from pathlib import Path
+from langchain_huggingface import HuggingFacePipeline
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
+import torch
+import re
+from langchain_core.prompts import ChatPromptTemplate
+from unittest.mock import patch
+from transformers.dynamic_module_utils import get_imports
+
+
+def fixed_get_imports(filename: str | os.PathLike) -> list[str]:
+    """Work around for https://huggingface.co/microsoft/phi-1_5/discussions/72."""
+    imports = get_imports(filename)
+    if not torch.cuda.is_available() and "flash_attn" in imports:
+        imports.remove("flash_attn")
+    return imports
+
+
+torch.set_default_device("cpu")
+with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
+    image_model = AutoModelForCausalLM.from_pretrained(
+        "microsoft/Florence-2-base", trust_remote_code=True
+    )
+    image_processor = AutoProcessor.from_pretrained(
+        "microsoft/Florence-2-base", trust_remote_code=True
+    )
+
+
+model_id = "MBZUAI/LaMini-Flan-T5-248M"  # LaMini-Flan-T5-783M
+model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+pipe = pipeline(
+    "text2text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=20,
+    temperature=1,
+    device="cpu",
+)
+llm = HuggingFacePipeline(pipeline=pipe)
 
 
 def image_name(file_path):
@@ -77,9 +124,19 @@ def image_name(file_path):
     parsed_answer = image_processor.post_process_generation(
         generated_text, task=prompt, image_size=(image.width, image.height)
     )
+    response = image_processor.post_process_generation(generated_text, task=prompt, image_size=(image.width, image.height))
 
-    return parsed_answer[prompt].replace(" ", "_")
 
+
+    response= response[prompt].replace(' ', '_')
+    first_period_index = response.find('.')
+
+    # Extract text before the first period
+    if first_period_index != -1:
+        response = response[:first_period_index]
+    else:
+        response
+    return response
 
 def text_name(file_path):
     """
@@ -146,50 +203,39 @@ def text_name(file_path):
 
     num_tokens = len(encoding.encode(str(word_content)))
 
-    while num_tokens > 5000:
+    while num_tokens > 2500:
         content_length = len(word_content)
         # Reduce the content by a certain ratio; here, reducing by 10%
-        new_length = int(content_length * 0.90)
+        new_length = int(content_length * 0.80)
         word_content = word_content[:new_length]
         num_tokens = len(encoding.encode(word_content))
 
-    messages = [
-        {
-            "role": "assistant",
-            "content": "You are an expert in generating file names based on the content provided. Given the content of a text or image file, suggest a concise and descriptive file name that is no longer than 20 characters. Ensure the name captures the essence of the content without including any personal or sensitive information. Do not include the file extension; provide only the file name.",
-        },
-        {"role": "user", "content": word_content},
-    ]
-    text = text_tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
+    sys = "You are an expert in generating file names based on the content provided. Given the content of a text or image file, suggest a concise and descriptive file name that is no longer than 20 characters. Ensure the name captures the essence of the content without including any personal or sensitive information. Do not include the file extension; provide only the file name."
+    human = "Content:{content} \n\n Only return File name and nothing else"
+    prompt = ChatPromptTemplate.from_messages(
+        messages=[("system", sys), ("human", human)]
     )
-    model_inputs = text_tokenizer([text], return_tensors="pt")
-
-    generated_ids = text_model.generate(
-        model_inputs.input_ids, max_new_tokens=20, temperature=0.7
-    )
-    generated_ids = [
-        output_ids[len(input_ids) :]
-        for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-    ]
-
-    response = text_tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+    chain = prompt | llm
+    response = chain.invoke({"content": word_content})
     response = response.replace(" ", "_")
-    first_period_index = response.find(".")
-
-    # Extract text before the first period
+    first_period_index = out.find(".")
     if first_period_index != -1:
         response = response[:first_period_index]
     else:
         response
+    pattern = r"File_name:_([A-Za-z_]+)"
 
-    if '"' in response or "'" in response:
-        response = response.replace('"', "").replace("'", "")
-    return response
+    # Search for the pattern in the filename
+    match = re.search(pattern, response)
+
+    if match:
+        extracted_name = match.group(1)
+        return extracted_name
 
 
-def change_file_name(old_file_name, response):
-    """
+def change_file_name(old_file_name,response):
+  '''
+      """
     Change the name of a file based on the provided response.
 
     This function renames a specified file by constructing a new name using the response provided,
@@ -232,11 +278,16 @@ def change_file_name(old_file_name, response):
       conventions.
     - The function will overwrite any existing file with the new name without warning.
     """
+  '''
+  path=Path(old_file_name)
+  directory_name = str(Path(old_file_name).parent)
+  file_extension = Path(old_file_name).suffix
 
-    directory_name = str(Path(old_file_name).parent)
-    file_extension = Path(old_file_name).suffix
-    new_name = directory_name + "/" + response + file_extension
-    os.rename(old_file_name, new_name)
+  if response is None:
+    response=path.name
+  new_name=directory_name+'/'+response+file_extension
+  os.rename(old_file_name,new_name)
+
 
 
 def get_all_files(directory):
@@ -361,26 +412,26 @@ def rename(directory_path):
     for file in files:
         if Path(file).suffix.lower() in img_supported_formats:
             original_name = Path(file).stem
-            output=image_name(file)
-            counter=1
-            original_output = output
-            while output in files_name and output != original_name:
-              output = f"{original_output}_{counter}"
-              counter += 1
-            files_name.append(output)
-            change_file_name(file,output)
-            print(f"[SUCCESS] Renamed {file} successfully!! ")
-        elif Path(file).suffix in supported_formats:
-            original_name = Path(file).stem
-            output=text_name(file)
-
-            counter=1
+            output = image_name(file)
+            counter = 1
             original_output = output
             while output in files_name and output != original_name:
                 output = f"{original_output}_{counter}"
                 counter += 1
             files_name.append(output)
-            change_file_name(file,output)
+            change_file_name(file, output)
+            print(f"[SUCCESS] Renamed {file} successfully!! ")
+        elif Path(file).suffix in supported_formats:
+            original_name = Path(file).stem
+            output = text_name(file)
+
+            counter = 1
+            original_output = output
+            while output in files_name and output != original_name:
+                output = f"{original_output}_{counter}"
+                counter += 1
+            files_name.append(output)
+            change_file_name(file, output)
             print(f"[SUCCESS] Renamed {file} successfully!! ")
         else:
             print("[ERROR] FILE TYPE NOT SUPPORTED")
