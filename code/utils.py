@@ -27,29 +27,29 @@ def fixed_get_imports(filename: str | os.PathLike) -> list[str]:
         imports.remove("flash_attn")
     return imports
 
+def load_model(device:str):
+    torch.set_default_device(device)
+    with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
+        image_model = AutoModelForCausalLM.from_pretrained(
+            "microsoft/Florence-2-base", trust_remote_code=True
+        )
+        image_processor = AutoProcessor.from_pretrained(
+            "microsoft/Florence-2-base", trust_remote_code=True
+        )
 
-torch.set_default_device("cpu")
-with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
-    image_model = AutoModelForCausalLM.from_pretrained(
-        "microsoft/Florence-2-base", trust_remote_code=True
+
+    model_id = "MBZUAI/LaMini-Flan-T5-248M"  # LaMini-Flan-T5-783M
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+    tokenizer = AutoTokenizer.from_pretrained(model_id)
+    pipe = pipeline(
+        "text2text-generation",
+        model=model,
+        tokenizer=tokenizer,
+        max_new_tokens=20,
+        temperature=1,
+        device=device,
     )
-    image_processor = AutoProcessor.from_pretrained(
-        "microsoft/Florence-2-base", trust_remote_code=True
-    )
-
-
-model_id = "MBZUAI/LaMini-Flan-T5-248M"  # LaMini-Flan-T5-783M
-model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-tokenizer = AutoTokenizer.from_pretrained(model_id)
-pipe = pipeline(
-    "text2text-generation",
-    model=model,
-    tokenizer=tokenizer,
-    max_new_tokens=20,
-    temperature=1,
-    device="cpu",
-)
-llm = HuggingFacePipeline(pipeline=pipe)
+    llm = HuggingFacePipeline(pipeline=pipe)
 
 
 def image_name(file_path):
@@ -334,7 +334,7 @@ def get_all_files(directory):
     return file_list
 
 
-def rename(directory_path):
+def rename(directory_path,device):
     """
     Rename files in a specified directory based on their content.
 
@@ -385,6 +385,7 @@ def rename(directory_path):
     - It is recommended to back up the directory before running this function to avoid unintentional data loss.
 
     """
+    load_model(device)
     supported_formats = [
         ".docx",
         ".doc",
