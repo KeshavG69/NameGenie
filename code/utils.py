@@ -27,29 +27,29 @@ def fixed_get_imports(filename: str | os.PathLike) -> list[str]:
         imports.remove("flash_attn")
     return imports
 
-def load_model(device:str):
-    torch.set_default_device(device)
-    with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
-        image_model = AutoModelForCausalLM.from_pretrained(
-            "microsoft/Florence-2-base", trust_remote_code=True
-        )
-        image_processor = AutoProcessor.from_pretrained(
-            "microsoft/Florence-2-base", trust_remote_code=True
-        )
 
-
-    model_id = "MBZUAI/LaMini-Flan-T5-248M"  # LaMini-Flan-T5-783M
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-    tokenizer = AutoTokenizer.from_pretrained(model_id)
-    pipe = pipeline(
-        "text2text-generation",
-        model=model,
-        tokenizer=tokenizer,
-        max_new_tokens=20,
-        temperature=1,
-        device=device,
+device = "cuda" if torch.cuda.is_available() else "cpu"
+torch.set_default_device(device)
+with patch("transformers.dynamic_module_utils.get_imports", fixed_get_imports):
+    image_model = AutoModelForCausalLM.from_pretrained(
+        "microsoft/Florence-2-base", trust_remote_code=True
     )
-    llm = HuggingFacePipeline(pipeline=pipe)
+    image_processor = AutoProcessor.from_pretrained(
+        "microsoft/Florence-2-base", trust_remote_code=True
+    )
+
+model_id = "MBZUAI/LaMini-Flan-T5-248M"  # LaMini-Flan-T5-783M
+model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+pipe = pipeline(
+    "text2text-generation",
+    model=model,
+    tokenizer=tokenizer,
+    max_new_tokens=20,
+    temperature=1,
+    device=device,
+)
+llm = HuggingFacePipeline(pipeline=pipe)
 
 
 def image_name(file_path):
@@ -124,19 +124,19 @@ def image_name(file_path):
     parsed_answer = image_processor.post_process_generation(
         generated_text, task=prompt, image_size=(image.width, image.height)
     )
-    response = image_processor.post_process_generation(generated_text, task=prompt, image_size=(image.width, image.height))
+    response = image_processor.post_process_generation(
+        generated_text, task=prompt, image_size=(image.width, image.height)
+    )
 
-
-
-    response= response[prompt].replace(' ', '_')
-    first_period_index = response.find('.')
+    response = response[prompt].replace(" ", "_")
+    first_period_index = response.find(".")
 
     # Extract text before the first period
     if first_period_index != -1:
         response = response[:first_period_index]
-    else:
-        response
+
     return response
+
 
 def text_name(file_path):
     """
@@ -218,11 +218,10 @@ def text_name(file_path):
     chain = prompt | llm
     response = chain.invoke({"content": word_content})
     response = response.replace(" ", "_")
-    first_period_index = out.find(".")
+    first_period_index = response.find(".")
     if first_period_index != -1:
         response = response[:first_period_index]
-    else:
-        response
+
     pattern = r"File_name:_([A-Za-z_]+)"
 
     # Search for the pattern in the filename
@@ -233,8 +232,8 @@ def text_name(file_path):
         return extracted_name
 
 
-def change_file_name(old_file_name,response):
-  '''
+def change_file_name(old_file_name, response):
+    '''
       """
     Change the name of a file based on the provided response.
 
@@ -278,16 +277,15 @@ def change_file_name(old_file_name,response):
       conventions.
     - The function will overwrite any existing file with the new name without warning.
     """
-  '''
-  path=Path(old_file_name)
-  directory_name = str(Path(old_file_name).parent)
-  file_extension = Path(old_file_name).suffix
+    '''
+    path = Path(old_file_name)
+    directory_name = str(Path(old_file_name).parent)
+    file_extension = Path(old_file_name).suffix
 
-  if response is None:
-    response=path.name
-  new_name=directory_name+'/'+response+file_extension
-  os.rename(old_file_name,new_name)
-
+    if response is None:
+        response = path.name
+    new_name = directory_name + "/" + response + file_extension
+    os.rename(old_file_name, new_name)
 
 
 def get_all_files(directory):
@@ -334,7 +332,7 @@ def get_all_files(directory):
     return file_list
 
 
-def rename(directory_path,device):
+def rename(directory_path):
     """
     Rename files in a specified directory based on their content.
 
@@ -385,7 +383,7 @@ def rename(directory_path,device):
     - It is recommended to back up the directory before running this function to avoid unintentional data loss.
 
     """
-    load_model(device)
+
     supported_formats = [
         ".docx",
         ".doc",
@@ -421,7 +419,7 @@ def rename(directory_path,device):
                 counter += 1
             files_name.append(output)
             change_file_name(file, output)
-            print(f"[SUCCESS] Renamed {file} successfully!! ")
+            print(f"[SUCCESS] Renamed {file} successfully to {output}!! ")
         elif Path(file).suffix in supported_formats:
             original_name = Path(file).stem
             output = text_name(file)
@@ -433,6 +431,6 @@ def rename(directory_path,device):
                 counter += 1
             files_name.append(output)
             change_file_name(file, output)
-            print(f"[SUCCESS] Renamed {file} successfully!! ")
+            print(f"[SUCCESS] Renamed {file} successfully to {output}!! ")
         else:
             print("[ERROR] FILE TYPE NOT SUPPORTED")
